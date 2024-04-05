@@ -66,6 +66,27 @@ submenu will be created, inserted into `parent-menu', and returned."
           (table.insert parent-menu.items new-submenu)
           new-submenu)))
 
+(fn find-or-create-action [key-object parent-menu ?prev-idx]
+  "Returns an action object in `parent-menu' at the key defined in `key-object', or errors if
+a menu is already defined for that key. If the requested action already exists, it
+will be returned directly; if the requested action does not exist, a empty default
+action will be created, inserted into `parent-menu', and returned."
+  (match (next parent-menu.items ?prev-idx)
+    ;; already a menu there? straight to jail.
+    (where (idx {: key : mods :items _})
+           (same-keybind? {: key : mods} key-object)) (error "An action cannot be defined at a keypath which contains a submenu")
+    ;; found it
+    (where (idx action-node)
+           (same-keybind? action-node key-object)) action-node
+    ;; if at first you don't succeed, try try again
+    (idx action-node) (find-or-create-action key-object parent-menu idx)
+    ;; if at last you don't succeed, make a new empty action at the given key
+    nil (let [{: key : mods} key-object
+              ;; we can rely on `title' and `action' to be immediately provided
+              new-action {: key : mods}]
+          (table.insert parent-menu.items new-action)
+          new-action)))
+
 (fn find-or-create-parent-menu [prefix-key-path]
   "Given a normalized key-path `prefix-key-path', walks the config object and returns the
 submenu at the final key of `prefix-key-path'. Any missing submenus will be created on the
@@ -99,6 +120,16 @@ last one, and the second being that last item."
           (tset menu key value)))
     menu))
 
+(fn set-normalized-action [key-path title action]
+  "Defines or renames a new action within `config', at `key-path'. Any intermediary menus in `key-path'
+  which do not already exist will be created with the default title of `+prefix'."
+  (let [(prefix-key-path key-object) (separate-out-last-item key-path)
+        parent-menu (find-or-create-parent-menu prefix-key-path)
+        action-node (find-or-create-action key-object parent-menu)]
+    (tset action-node :title title)
+    (tset action-node :action action)
+    action-node))
+
 (fn menu! [keys title options]
   "Define a (possibly nested) menu in the pop-up modal interface. If the menu does not exist, it will be created; if it does, it will be modified based on your provided definition.
 
@@ -114,8 +145,12 @@ The `options` argument accepts a table for other table options like `:enter` and
 (fn action! [keys title action]
   "Define a new action within the popup modal interface.
 
-The `keys` argument accepts either a string (e.g. for an action bound to `k` within a submodal bound to `as`, the `keys` argument should be the string `ask`; any missing menus will be automatically created) or a list, which can contain either strings or tables (e.g. for a sibling action bound to Command-g, the `keys` argument should be `[:a :s {:mods [:cmd] :key :g}]`). Optionally, you can define a custom title for the action in its containing menu."
-  :unimplemented)
+The `keys` argument accepts either a string (e.g. for an action bound to `k` within a
+submodal bound to `as`, the `keys` argument should be the string `ask`; any missing menus
+will be automatically created) or a list, which can contain either strings or tables (e.g.
+for a sibling action bound to Command-g, the `keys` argument should be `[:a :s {:mods
+[:cmd] :key :g}]`)."
+  (set-normalized-action (normalize-key-path keys) title action))
 
 ;; export for use in other files
 {: menu!
