@@ -39,7 +39,7 @@ is a deep comparison; nested tables are checked recursively."
   identical values, they are considered equal."
   (assert
    (and (structurally-eq? actual expected) (structurally-eq? expected actual))
-   (.. "expected" (hs.inspect expected) " but instead got " (hs.inspect actual))))
+   (.. "expected " (hs.inspect expected) " but instead got " (hs.inspect actual))))
 
 (fn exports.structural-subset?
   [actual expected]
@@ -47,6 +47,6 @@ is a deep comparison; nested tables are checked recursively."
   in `actual' and is associated with the same value, they are considered equal. There may
   be additional unspecified items in `actual'."
   (assert (structurally-eq? actual expected)
-          (.. "expected" (hs.inspect expected) " but instead got " (hs.inspect actual))))
+          (.. "expected " (hs.inspect expected) " but instead got " (hs.inspect actual))))
 
 exports
