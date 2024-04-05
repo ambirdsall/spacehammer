@@ -2,17 +2,20 @@
 
 (local {: menu!
         : action!
+        : leader-key!
         : config
         : normalize-key-path} (require :spacehammer.forge))
 (local {: hide-display-numbers} (require :spacehammer.windows))
 
-(fn reset-config! [] (tset config :items []))
+(fn reset-config! []
+  (tset config :items [])
+  (tset config :keys []))
+
 (fn dummy-action [])
 
 (describe
  "Forge: config builder functions"
  (fn []
-   (after reset-config!)
    (it "normalizes keypaths"
        (fn []
          (is.structurally-eq? (normalize-key-path "abc") [{:key :a} {:key :b} {:key :c}])
@@ -22,6 +25,7 @@
 
    (it "adds menus to the config object"
        (fn []
+         (reset-config!)
          (is.structurally-eq?
           config
           {:title "Main Menu"
@@ -58,12 +62,11 @@
            :enter hide-display-numbers
            :exit hide-display-numbers
            :keys []
-           :apps []})
-
-         (reset-config!)))
+           :apps []})))
 
    (it "adds actions to the config object"
        (fn []
+         (reset-config!)
          (is.structurally-eq?
           config
           {:title "Main Menu"
@@ -87,5 +90,32 @@
            :enter hide-display-numbers
            :exit hide-display-numbers
            :keys []
-           :apps []})
-         ))))
+           :apps []})))
+
+   (it "can set the modal leader key"
+     (fn []
+       (reset-config!)
+       (leader-key! {:mods [:alt] :key :space})
+       (is.structurally-eq?
+        config
+        {:title "Main Menu"
+         :items []
+         :enter hide-display-numbers
+         :exit hide-display-numbers
+         :keys [{:mods [:alt]
+                 :key :space
+                 :action "spacehammer.lib.modal:activate-modal"}]
+         :apps []})
+
+       ;; multiple calls reset the leader key(s)
+       (leader-key! {:mods [:cmd] :key :space})
+       (is.structurally-eq?
+        config
+        {:title "Main Menu"
+         :items []
+         :enter hide-display-numbers
+         :exit hide-display-numbers
+         :keys [{:mods [:cmd]
+                 :key :space
+                 :action "spacehammer.lib.modal:activate-modal"}]
+         :apps []})))))

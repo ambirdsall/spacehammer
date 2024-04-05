@@ -12,6 +12,8 @@
                :exit  hide-display-numbers
                :apps []})
 
+(local activate-modal-action "spacehammer.lib.modal:activate-modal")
+
 ;; TODO auto-shift capitals, i.e. "aB" -> [{:key :a} {:key :b :mods [:shift]}]
 (fn normalize-key-path [key-path-string-or-table]
   "Returns a normalized key path. A normalized key path is a list of key objects, where
@@ -152,8 +154,31 @@ for a sibling action bound to Command-g, the `keys` argument should be `[:a :s {
 [:cmd] :key :g}]`)."
   (set-normalized-action (normalize-key-path keys) title action))
 
+(fn clear-leader-keys []
+  ;; iterate through config.keys
+  ;; delete every node whose action is activating the modal
+  (each [idx global-binding (ipairs config.keys)]
+    (if (= global-binding.action activate-modal-action)
+        (table.remove config.keys idx))))
+
+(fn global-binding! [key-path action]
+  (let [[{: key : mods}] (normalize-key-path key-path)]
+    (table.insert config.keys {: key : mods : action})))
+
+(fn leader-key! [...]
+  "Set one or more leader key bindings for opening the modal UI of spacehammer actions.
+
+If multiple keybindings are provided, multiple leader keys will be defined; each time its
+called anew, all previously-defined leader key bindings are erased, which ensures that you
+can edit your leader key(s) and reload without cluttering your global keymap."
+  (clear-leader-keys)
+  (each [_ key-path (ipairs [...])]
+    (global-binding! key-path activate-modal-action)))
+
 ;; export for use in other files
 {: menu!
  : action!
+ : leader-key!
+ : global-binding!
  : config
  : normalize-key-path}
