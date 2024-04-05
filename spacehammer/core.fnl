@@ -6,6 +6,7 @@
       (hs.ipc.cliInstall homebrew-silicon-prefix)
       (hs.ipc.cliInstall)))
 
+;; load imports and macros
 (local fennel (require :spacehammer.vendor.fennel))
 (require :spacehammer.lib.globals)
 (local {: file-exists?
@@ -101,7 +102,12 @@
 ;;   collection.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; we should still support exporting a configuration table from the user's config file for
+;; backwards compatibility; it should be merged with any functionally-defined config
 (local config (require :config))
+
+;; TODO merge imported config table with the config defined with forge functions
+;; the old configuration style takes precedence to respect source ordering
 
 ;; Initialize our modules that depend on config
 (local modules [:spacehammer.lib.hyper
