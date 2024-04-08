@@ -27,6 +27,10 @@
 
    (it "find returns an item from table list that matches predicate"
        (fn []
-         (is.eq? (f.find #(= $1 :b) [:a :b :c]) :b "find did not return :b")))))
+         (is.eq? (f.find #(= $1 :b) [:a :b :c]) :b "find did not return :b")))
 
-
+   (it "deep-merge merges. Deeply."
+       (fn []
+         (is.structurally-eq?
+          (f.deep-merge {:a {:b 2} :c 3} {:a {:d 4} :e 5})
+          {:a {:b 2 :d 4} :c 3 :e 5})))))

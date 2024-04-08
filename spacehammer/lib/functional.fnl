@@ -184,6 +184,22 @@
      {}
      tbls)))
 
+(fn deep-merge [...]
+  (let [tbls [...]]
+    (reduce
+     (fn deep-merger [merged tbl]
+       (each [k v (pairs tbl)]
+         (case (type v)
+           :table (tset merged k
+                        (deep-merge (case (type (. merged k))
+                                      :table (. merged k)
+                                      :nil (tset merged k {}))
+                                    (. tbl k)))
+           _ (tset merged k v)))
+       merged)
+     {}
+     tbls)))
+
 (fn filter
  [f tbl]
  (reduce
@@ -246,6 +262,7 @@
  : conj
  : contains?
  : count
+ : deep-merge
  : eq?
  : filter
  : find
