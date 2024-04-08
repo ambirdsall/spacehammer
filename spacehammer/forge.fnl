@@ -42,12 +42,21 @@ objects (for example, {:key :space} or {:key :c :mods [:cmd :ctrl]})."
    : mods
    :items []})
 
+(fn empty-default-app-config [app-name]
+  "Returns a new instance of an empty app config table."
+  {:key app-name
+   :keys []
+   :items []})
+
+;; TODO make mods comparison order-independent
 (fn same-keybind? [a b]
   "Predicate for identical keybinds for a menu item (submenu or action). Arguments with
 matching :key and :mods values return true."
   (and (= a.key b.key)
        (= (and a.mods (table.unpack a.mods))
-          (and b.mods (table.unpack b.mods)))))
+          (and b.mods (table.unpack b.mods)))
+       (= (and a.mods (length a.mods))
+          (and b.mods (length b.mods)))))
 
 (fn find-or-create-submenu [key-object parent-menu ?prev-idx]
   "Returns a menu object in `parent-menu' at the key defined in `key-object', or errors if
@@ -67,6 +76,23 @@ submenu will be created, inserted into `parent-menu', and returned."
     nil (let [new-submenu (empty-default-submenu key-object)]
           (table.insert parent-menu.items new-submenu)
           new-submenu)))
+
+(fn find-or-create-binding [key-object keys-list ?prev-idx]
+  "Returns an action object in `parent-menu' at the key defined in `key-object', or errors if
+a menu is already defined for that key. If the requested action already exists, it
+will be returned directly; if the requested action does not exist, a empty default
+action will be created, inserted into `parent-menu', and returned."
+  (match (next keys-list ?prev-idx)
+    ;; found it
+    (where (idx binding)
+           (same-keybind? binding key-object)) binding
+    ;; if at first you don't succeed, try try again
+    (idx binding) (find-or-create-binding key-object keys-list idx)
+    ;; if at last you don't succeed, make a new empty binding at the given key
+    nil (let [{: key : mods} key-object
+              new-binding {: key : mods}]
+          (table.insert keys-list new-binding)
+          new-binding)))
 
 (fn find-or-create-action [key-object parent-menu ?prev-idx]
   "Returns an action object in `parent-menu' at the key defined in `key-object', or errors if
@@ -89,15 +115,16 @@ action will be created, inserted into `parent-menu', and returned."
           (table.insert parent-menu.items new-action)
           new-action)))
 
-(fn find-or-create-parent-menu [prefix-key-path]
-  "Given a normalized key-path `prefix-key-path', walks the config object and returns the
-submenu at the final key of `prefix-key-path'. Any missing submenus will be created on the
-fly; if any action is encountered within `prefix-key-path', an error will be raised.
+(fn find-or-create-parent-menu [prefix-key-path ?parent-menu]
+  "Given a normalized key-path `prefix-key-path' and optionally a `?parent-menu', walks
+`?parent-menu' (by default, the config object) and returns the submenu at the final key of
+`prefix-key-path'. Any missing submenus will be created on the fly; if any action is
+encountered within `prefix-key-path', an error will be raised.
 
 Assumes that `prefix-key-path' is the full intended path of the parent menu: calling code
 using this to ensure that an appropriate parent menu is defined for some action or submenu
 is responsible for providing only the parent menu's segment of the key-path."
-  (var parent-menu config)
+  (var parent-menu (or ?parent-menu config))
   (each [_ key (ipairs prefix-key-path)]
     (let [next-parent (find-or-create-submenu key parent-menu)]
       (set parent-menu next-parent)))
@@ -110,11 +137,21 @@ last one, and the second being that last item."
     (values (icollect [idx item (ipairs list)] (if (not= idx len) item))
             (. list len))))
 
-(fn set-normalized-menu [key-path title options]
-  "Defines or renames a new menu item within `config', at `key-path'. Any intermediary menus in `key-path'
-  which do not already exist will be created with the default title of `+prefix'."
+(fn set-normalized-menu [key-path title options ?top-level-menu]
+  "Defines or renames a new menu item within `?top-level-menu' (by default, `config'), at
+  `key-path'. Any intermediary menus in `key-path' which do not already exist will be
+  created with the default title of `+prefix'."
+  ;; if the user provides invalid options, error before executing any potentially
+  ;; destructive mutations
+  (if options
+      (each [key _ (pairs options)]
+        (case key
+          :enter nil
+          :exit nil
+          _ (error (.. "Attempted to define unknown menu option " key)))))
+
   (let [(prefix-key-path key-object) (separate-out-last-item key-path)
-        parent-menu (find-or-create-parent-menu prefix-key-path)
+        parent-menu (find-or-create-parent-menu prefix-key-path ?top-level-menu)
         menu (find-or-create-submenu key-object parent-menu)]
     (tset menu :title title)
     (if options
@@ -122,15 +159,30 @@ last one, and the second being that last item."
           (tset menu key value)))
     menu))
 
-(fn set-normalized-action [key-path title action]
-  "Defines or renames a new action within `config', at `key-path'. Any intermediary menus in `key-path'
-  which do not already exist will be created with the default title of `+prefix'."
+(fn set-normalized-action [key-path title action ?top-level-menu]
+  "Defines or renames a new action within `?top-level-menu' (by default, `config'), at
+  `key-path'. Any intermediary menus in `key-path' which do not already exist will be
+  created with the default title of `+prefix'."
   (let [(prefix-key-path key-object) (separate-out-last-item key-path)
-        parent-menu (find-or-create-parent-menu prefix-key-path)
+        parent-menu (find-or-create-parent-menu prefix-key-path ?top-level-menu)
         action-node (find-or-create-action key-object parent-menu)]
     (tset action-node :title title)
     (tset action-node :action action)
     action-node))
+
+;; TODO write docstring
+(fn find-or-create-app-config [app-name ?prev-idx]
+  ""
+  (match (next config.apps ?prev-idx)
+    ;; found it
+    (where (idx app-node)
+           (= app-node.key app-name)) app-node
+    ;; if at first you don't succeed, try try again
+    (idx app-node) (find-or-create-app-config app-name idx)
+    ;; if at last you don't succeed, make a new config table for app-name
+    nil (let [new-app-config (empty-default-app-config app-name)]
+          (table.insert config.apps new-app-config)
+          new-app-config)))
 
 (fn clear-leader-keys []
   ;; iterate through config.keys
@@ -139,10 +191,30 @@ last one, and the second being that last item."
     (if (= global-binding.action activate-modal-action)
         (table.remove config.keys idx))))
 
-;; TODO accept options for bindings, e.g. :repeat true
-(fn global-binding! [key-path action]
-  (let [[{: key : mods}] (normalize-key-path key-path)]
-    (table.insert config.keys {: key : mods : action})))
+;; TODO write docstring
+(fn set-normalized-binding [key-path action top-level-config options]
+  ""
+  (let [[{: key : mods}] key-path
+        binding (find-or-create-binding {: key : mods} top-level-config.keys)]
+    (tset binding :key key)
+    (tset binding :mods mods)
+    (tset binding :action action)
+    (if options
+        (let [{: repeat} options]
+          (tset binding :repeat repeat)))))
+
+(fn app-config! [app-name options]
+  "Configure application-scoped settings and callbacks for `app-name'. To define
+  application-scoped actions, menus, or bindings, refer to `app-scoped-action!',
+  `app-scoped-menu!', or `app-scoped-binding!', respectively."
+  (let [app-conf (find-or-create-app-config app-name)
+        {: activate : deactivate : launch} options]
+    (tset app-conf :activate activate)
+    (tset app-conf :deactivate deactivate)
+    (tset app-conf :launch launch)))
+
+(fn global-binding! [keys action options]
+  (set-normalized-binding (normalize-key-path keys) action config options))
 
 (fn leader! [...]
   "Set one or more leader key bindings for opening the modal UI of spacehammer actions.
@@ -176,13 +248,26 @@ for a sibling action bound to Command-g, the `keys` argument should be `[:a :s {
 [:cmd] :key :g}]`)."
   (set-normalized-action (normalize-key-path keys) title action))
 
+(fn app-scoped-binding! [app-name keys action options]
+  (set-normalized-binding
+   (normalize-key-path keys)
+   action
+   (find-or-create-app-config app-name)
+   options))
 
+(fn app-scoped-menu! [app-name keys title options]
+  (set-normalized-menu (normalize-key-path keys) title options (find-or-create-app-config app-name)))
 
+(fn app-scoped-action! [app-name keys title action]
+  (set-normalized-action (normalize-key-path keys) title action (find-or-create-app-config app-name)))
 
 ;; export for use in other files
 {: menu!
  : action!
  : leader!
  : global-binding!
+ : app-scoped-menu!
+ : app-scoped-action!
+ : app-scoped-binding!
  : config
  : normalize-key-path}
