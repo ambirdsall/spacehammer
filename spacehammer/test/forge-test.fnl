@@ -2,7 +2,7 @@
 
 (local {: menu!
         : action!
-        : leader-key!
+        : leader!
         : config
         : normalize-key-path} (require :spacehammer.forge))
 (local {: hide-display-numbers} (require :spacehammer.windows))
@@ -95,7 +95,7 @@
    (it "can set the modal leader key"
      (fn []
        (reset-config!)
-       (leader-key! {:mods [:alt] :key :space})
+       (leader! {:mods [:alt] :key :space})
        (is.structurally-eq?
         config
         {:title "Main Menu"
@@ -108,7 +108,7 @@
          :apps []})
 
        ;; multiple calls reset the leader key(s)
-       (leader-key! {:mods [:cmd] :key :space})
+       (leader! {:mods [:cmd] :key :space})
        (is.structurally-eq?
         config
         {:title "Main Menu"

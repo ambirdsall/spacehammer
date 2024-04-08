@@ -132,6 +132,28 @@ last one, and the second being that last item."
     (tset action-node :action action)
     action-node))
 
+(fn clear-leader-keys []
+  ;; iterate through config.keys
+  ;; delete every node whose action is activating the modal
+  (each [idx global-binding (ipairs config.keys)]
+    (if (= global-binding.action activate-modal-action)
+        (table.remove config.keys idx))))
+
+;; TODO accept options for bindings, e.g. :repeat true
+(fn global-binding! [key-path action]
+  (let [[{: key : mods}] (normalize-key-path key-path)]
+    (table.insert config.keys {: key : mods : action})))
+
+(fn leader! [...]
+  "Set one or more leader key bindings for opening the modal UI of spacehammer actions.
+
+If multiple keybindings are provided, multiple leader keys will be defined; each time its
+called anew, all previously-defined leader key bindings are erased, which ensures that you
+can edit your leader key(s) and reload without cluttering your global keymap."
+  (clear-leader-keys)
+  (each [_ key-path (ipairs [...])]
+    (global-binding! key-path activate-modal-action)))
+
 (fn menu! [keys title options]
   "Define a (possibly nested) menu in the pop-up modal interface. If the menu does not exist, it will be created; if it does, it will be modified based on your provided definition.
 
@@ -154,31 +176,13 @@ for a sibling action bound to Command-g, the `keys` argument should be `[:a :s {
 [:cmd] :key :g}]`)."
   (set-normalized-action (normalize-key-path keys) title action))
 
-(fn clear-leader-keys []
-  ;; iterate through config.keys
-  ;; delete every node whose action is activating the modal
-  (each [idx global-binding (ipairs config.keys)]
-    (if (= global-binding.action activate-modal-action)
-        (table.remove config.keys idx))))
 
-(fn global-binding! [key-path action]
-  (let [[{: key : mods}] (normalize-key-path key-path)]
-    (table.insert config.keys {: key : mods : action})))
 
-(fn leader-key! [...]
-  "Set one or more leader key bindings for opening the modal UI of spacehammer actions.
-
-If multiple keybindings are provided, multiple leader keys will be defined; each time its
-called anew, all previously-defined leader key bindings are erased, which ensures that you
-can edit your leader key(s) and reload without cluttering your global keymap."
-  (clear-leader-keys)
-  (each [_ key-path (ipairs [...])]
-    (global-binding! key-path activate-modal-action)))
 
 ;; export for use in other files
 {: menu!
  : action!
- : leader-key!
+ : leader!
  : global-binding!
  : config
  : normalize-key-path}
